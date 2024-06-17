@@ -148,7 +148,7 @@ class DeviceInfoFragment : Fragment() {
                 reply = chatResponse?.choices?.get(0)?.message?.content
                 Log.d("MainActivity", "Reply from OpenAI: $reply")
             } else {
-                Log.e("MainActivity", "Error: ${response.message()}")
+                Log.e("MainActivity", "Error: ${response.code()}")
             }
         }
 
