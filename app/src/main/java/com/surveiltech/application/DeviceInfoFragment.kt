@@ -9,6 +9,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
+import androidx.cardview.widget.CardView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -46,6 +47,7 @@ class DeviceInfoFragment : Fragment() {
     private lateinit var myTextView: TextView
     private val chatRepository = ChatRespository()
     var ProtocolString: String = ""
+    lateinit var CardGPT : CardView
 
     override fun onCreateView(
 
@@ -56,18 +58,20 @@ class DeviceInfoFragment : Fragment() {
         val recyclerView = view.findViewById<RecyclerViewCommon>(R.id.list)
         val argumentDeviceId = arguments?.getLong("deviceId")!!
         val copyUtil = CopyUtil(view)
-
+        CardGPT = view.findViewById<CardView>(R.id.CardGpt)
+        scanAllPortsButton = view.findViewById(R.id.scanAllPortsButton)
         val deviceTypeTextView = view.findViewById<TextView>(R.id.deviceTypeTextView)
         val deviceIpTextView = view.findViewById<TextView>(R.id.deviceIpTextView)
         val deviceNameTextView = view.findViewById<TextView>(R.id.deviceNameTextView)
         val deviceHwAddressTextView = view.findViewById<TextView>(R.id.deviceHwAddressTextView)
         val deviceVendorTextView = view.findViewById<TextView>(R.id.deviceVendorTextView)
-        myTextView = view.findViewById(R.id.textGPT)
+        val myTextView = view.findViewById<TextView>(R.id.textGPT)
         copyUtil.makeTextViewCopyable((deviceTypeTextView))
         copyUtil.makeTextViewCopyable((deviceIpTextView))
         copyUtil.makeTextViewCopyable(deviceNameTextView)
         copyUtil.makeTextViewCopyable(deviceHwAddressTextView)
         copyUtil.makeTextViewCopyable(deviceVendorTextView)
+        copyUtil.makeTextViewCopyable((myTextView))
         viewModel.deviceDao.getById(argumentDeviceId).observe(viewLifecycleOwner, Observer {
             fetchInfo(it.asDevice)
             deviceTypeTextView.text = getString(it.deviceType.label)
@@ -127,30 +131,48 @@ class DeviceInfoFragment : Fragment() {
                 return { item ->
                     portNumberTextView.text = item.port.toString()
                     protocolTextView.text = item.protocol.toString()
-                    ProtocolString += item.port.toString()
+                    ProtocolString += " " + item.port.toString()
+                    Log.d("portProtocol","$ProtocolString")
                     serviceTextView.text = item.description?.serviceName
                 }
             }
 
         })
 
-        val apiInterface = ApiClient.getInstance()
+
+        scanAllPortsButton.setOnClickListener {
+            GlobalScope.launch(Dispatchers.IO) {
+                val apiInterface = ApiClient.getInstance()
 
 
-        val message = Message("Hello, how are you?", "user")
-        val chatRequest = ChatRequest(listOf(message), "gpt-3.5-turbo-16k")
-        var reply:String?
-        GlobalScope.launch(Dispatchers.IO) {
-            val response = apiInterface.createChatCompletion(chatRequest).execute()
+                val message = Message("Donne moi le type d'appareil et les recommandation de sécurité pour un appareil IoT avec les ports $ProtocolString ouverts", "user")
+                val chatRequest = ChatRequest(listOf(message), "gpt-3.5-turbo-16k")
+                var reply:String?
 
-            if (response.isSuccessful) {
-                val chatResponse = response.body()
-                reply = chatResponse?.choices?.get(0)?.message?.content
-                Log.d("MainActivity", "Reply from OpenAI: $reply")
-            } else {
-                Log.e("MainActivity", "Error: ${response.code()}")
+                val response = apiInterface.createChatCompletion(chatRequest).execute()
+
+                if (response.isSuccessful) {
+                    val chatResponse = response.body()
+
+                    reply = chatResponse?.choices?.get(0)?.message?.content
+                    Log.d("MainActivity", "Reply from OpenAI: $reply")
+                    val test = reply
+                    requireActivity().runOnUiThread {
+                        myTextView.text = test
+                        CardGPT.visibility = View.VISIBLE
+                        scanAllPortsButton.visibility = View.GONE
+
+                    }
+
+
+                } else {
+                    Log.e("MainActivity", "Error: ${response.code()}")
+                }
             }
+
         }
+
+
 
         return view
     }
